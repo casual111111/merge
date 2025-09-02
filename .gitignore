@@ -1,0 +1,12 @@
+results/*
+lolv1_offical_results/*
+# Python 缓存
+__pycache__/
+*.py[cod]
+*.pyo
+
+# 模型权重
+*.pth
+
+# 日志文件（如果有）
+*.log

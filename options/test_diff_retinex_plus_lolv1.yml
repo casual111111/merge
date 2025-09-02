@@ -9,8 +9,8 @@ datasets:
   val:
     name: LOL
     type: LoLDataset
-    gt_root: "./dataset/LOL-v1/eval15/high"
-    input_root: "./dataset/LOL-v1/eval15/low"
+    gt_root: "/root/autodl-tmp/dataset/LLLR/LOL/lol_dataset/eval15/high"
+    input_root: "/root/autodl-tmp/dataset/LLLR/LOL/lol_dataset/eval15/low"
     input_mode: pad
     divide: 32
     concat_with_hiseq: true
@@ -55,7 +55,7 @@ ddpm_schedule:
 
 # path
 path:
-  pretrain_network_ddpm: "./pretrained_weights/lolv1/net_g_ddpm_val_lolv1.pth"
+  pretrain_network_ddpm: "./pretrained_weights/net_g_ddpm_val_lolv1.pth"
   strict_load_ddpm: true
   resume_state: ~
 
