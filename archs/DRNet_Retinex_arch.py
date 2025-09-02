@@ -86,7 +86,7 @@ class WithBias_LayerNorm(nn.Module):
     def forward(self, x):
         mu = x.mean(-1, keepdim=True)
         sigma = x.var(-1, keepdim=True, unbiased=False)
-        return (x - mu) / torch.sqrt(sigma + 1e-5) * self.weight + self.bias
+        return (x - mu) / torch.sqrt(sigma + 1e-5) * self.weight + self.bias#归一化
 
 
 class LayerNorm(nn.Module):
@@ -261,7 +261,7 @@ class Illum_Guided_TransformerBlock(nn.Module):
         self.ffn = FeedForward(dim, ffn_expansion_factor, bias)
 
     def forward(self, x, illum):
-        x = x + self.attn(self.norm1(x), self.normL(illum))
+        x = x + self.attn(self.norm1(x), self.normL(illum))#归一化加通道注意力
         x = x + self.ffn(self.norm2(x))
         return x
     
@@ -453,11 +453,11 @@ class DRNet_Retinex_time(nn.Module):
         t = self.noise_level_mlp(time)
         inp_img = torch.cat((inp_img, diff_img), 1)
         inp_enc_level1 = self.patch_embed(inp_img)
-        out_enc_level1, MoE_loss_enc_1 = self.encoder_level1(inp_enc_level1)
-        out_enc_level1 = self.t_enc_layer1(out_enc_level1, t)
+        out_enc_level1, MoE_loss_enc_1 = self.encoder_level1(inp_enc_level1)#专家网络
+        out_enc_level1 = self.t_enc_layer1(out_enc_level1, t)#噪声调制
         
         inp_enc_level2 = self.down1_2(out_enc_level1)
-        out_enc_level2, MoE_loss_enc_2_1 = self.encoder_level2(inp_enc_level2)
+        out_enc_level2, MoE_loss_enc_2_1 = self.encoder_level2(inp_enc_level2)#专家网络
         out_enc_level2, MoE_loss_enc_2_2 = self.encoder_level2_time(out_enc_level2, t)
         MoE_loss_enc_2 = MoE_loss_enc_2_1 + MoE_loss_enc_2_2
         out_enc_level2 = self.t_enc_layer2(out_enc_level2, t)

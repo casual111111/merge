@@ -185,7 +185,7 @@ class GaussianDiffusion(nn.Module):
         if ddim_discr_method == 'uniform':
             c = self.num_timesteps // ddim_timesteps
             ddim_timestep_seq = list(reversed(range(self.num_timesteps - 1, -1, -c)))
-            ddim_timestep_seq = np.asarray(ddim_timestep_seq)
+            ddim_timestep_seq = np.asarray(ddim_timestep_seq)#变成numpy数组
         elif ddim_discr_method == 'quad':
             ddim_timestep_seq = (
                 (np.linspace(0, np.sqrt(self.num_timesteps * .8), ddim_timesteps)) ** 2
@@ -209,12 +209,12 @@ class GaussianDiffusion(nn.Module):
                 all_process = [F.interpolate(sample_img, (h, w))]
             t = torch.full((b,), ddim_timestep_seq[i], device=device, dtype=torch.long)
 
-            noise_level = torch.FloatTensor([self.sqrt_alphas_cumprod_prev[t + 1]]).repeat(b, 1).to(device)
+            noise_level = torch.FloatTensor([self.sqrt_alphas_cumprod_prev[t + 1]]).repeat(b, 1).to(device)#这里是第t步
 
             prev_t = torch.full((b,), ddim_timestep_prev_seq[i], device=device, dtype=torch.long)
             
             # get current and previous alpha_cumprod
-            alpha_cumprod_t = self._extract(self.alphas_cumprod, t, sample_img.shape)
+            alpha_cumprod_t = self._extract(self.alphas_cumprod, t, sample_img.shape)#每个像素的aerfa系数
             if i == 0:
                 alpha_cumprod_t_prev = torch.ones_like(alpha_cumprod_t)
             else:

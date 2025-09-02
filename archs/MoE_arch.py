@@ -9,13 +9,13 @@ class SparseDispatcher(object):
     def __init__(self, num_experts, gates):
         self._gates = gates
         self._num_experts = num_experts
-        # sort experts
+        # sort experts 返回每个样本对应的专家号，以及排序后的索引[0,0],[0,4]第0个样本对应的专家0和4
         sorted_experts, index_sorted_experts = torch.nonzero(gates).sort(0)
-        # drop indices
+        # drop indices 只保留专家号
         _, self._expert_index = sorted_experts.split(1, dim=1)
-        # get according batch index for each expert
+        # get according batch index for each expert 找到专家都来自哪个样本
         self._batch_index = torch.nonzero(gates)[index_sorted_experts[:, 1], 0]
-        # calculate num samples that each expert gets
+        # calculate num samples that each expert gets计算每个专家分配到多少样本
         self._part_sizes = (gates > 0).sum(0).tolist()
         # expand gates to match with self._batch_index
         gates_exp = gates[self._batch_index.flatten()]
@@ -137,15 +137,19 @@ class MoE_layer(nn.Module):
         gates, load = self.noisy_top_k_gating(x, self.training)
 
         # calculate importance loss
-        importance = gates.sum(0)
-
+        importance = gates.sum(0)#按0维度求和
+        #loss用来衡量专家是否使用均衡
         loss = self.cv_squared(importance) + self.cv_squared(load)
         loss *= loss_coef
 
-        # 2. batch dispatcher
+        # 2. batch dispatcher      
         dispatcher = SparseDispatcher(self.num_experts, gates)
-        expert_inputs = dispatcher.dispatch(x)
-        gates = dispatcher.expert_to_gates()
+         #self._expert_index → 每个路由对应的专家 ID
+        # #self._batch_index → 每个路由对应的样本 ID
+        # #self._part_sizes → 每个专家分到的样本数量
+        # #self._nonzero_gates → 每个 (样本, 专家) 的权重
+        expert_inputs = dispatcher.dispatch(x)#6个专家对应的样本，及样本数量
+        gates = dispatcher.expert_to_gates()#每个专家对应的权重
         expert_outputs = [self.experts[i](expert_inputs[i]) for i in range(self.num_experts)]
         y = dispatcher.combine(expert_outputs)
 

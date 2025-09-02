@@ -311,7 +311,7 @@ class SR3UNet(nn.Module):
         out_channel=3,
         inner_channel=32,
         norm_groups=32,
-        channel_mults=(1, 2, 4, 8, 8),
+        channel_mults=(1, 2, 4, 8, 8),#unet
         attn_res=(8),
         res_blocks=3,
         dropout=0,
@@ -335,10 +335,10 @@ class SR3UNet(nn.Module):
         if with_noise_level_emb:
             noise_level_channel = inner_channel
             self.noise_level_mlp = nn.Sequential(
-                PositionalEncoding(inner_channel),
-                nn.Linear(inner_channel, inner_channel * 4),
-                Swish(),
-                nn.Linear(inner_channel * 4, inner_channel)
+                PositionalEncoding(inner_channel),#位置编码
+                nn.Linear(inner_channel, inner_channel * 4),#线性层
+                Swish(),#激活函数
+                nn.Linear(inner_channel * 4, inner_channel)#线性层
             )
         else:
             noise_level_channel = None
@@ -398,19 +398,19 @@ class SR3UNet(nn.Module):
         self.final_conv = Block(pre_channel, default(out_channel, in_channel), groups=norm_groups)
 
     def forward(self, x, time=None):
-        if self.channel_randperm_input:
+        if self.channel_randperm_input:#随机打乱前6个通道
             from scripts.pytorch_utils import channel_randperm
             x[:, :6, ...] = channel_randperm(x[:, :6, ...])
-        if self.drop2d_input:
+        if self.drop2d_input:#对前6个通道做随机dropout
             x[:, :6, ...] = self.drop2d_in(x[:, :6, ...])
-        if self.divide:
+        if self.divide:#使分辨率能被divide整除
             x, pad_left, pad_right, pad_top, pad_bottom = pad_tensor(x, self.divide)
         t = self.noise_level_mlp(time) if exists(
-            self.noise_level_mlp) else None
+            self.noise_level_mlp) else None#噪声调制信息
 
         feats = []
         for layer in self.downs:
-            if isinstance(layer, ResnetBlocWithAttn):
+            if isinstance(layer, ResnetBlocWithAttn):#只有ResnetBlocWithAttn块需要时间调制信息
                 x = layer(x, t)
             else:
                 x = layer(x)

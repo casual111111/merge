@@ -16,7 +16,7 @@ def pad_tensor(input, divide=16):
         width_res = width_org % divide
         height_res = height_org % divide
         if width_res != 0:
-            width_div = divide - width_res
+            width_div = divide - width_res#横向需要填充的值
             pad_left = int(width_div / 2)
             pad_right = int(width_div - pad_left)
         else:
