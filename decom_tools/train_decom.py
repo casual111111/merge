@@ -37,11 +37,11 @@ def main(args):
     start_epoch = 0
 
     train_low_path, train_high_path, val_low_path, val_high_path = read_data(args.data_path)
-
+#数据增强
     data_transform = {
-        "train": T.Compose([T.RandomCrop(128),
-                            T.RandomHorizontalFlip(0.5),
-                            T.RandomVerticalFlip(0.5),
+        "train": T.Compose([T.RandomCrop(128),#随机裁剪到 128x128 大小，增强模型的鲁棒性
+                            T.RandomHorizontalFlip(0.5),#以 50% 概率随机水平翻转
+                            T.RandomVerticalFlip(0.5),#以 50% 概率随机垂直翻转
                             T.ToTensor()]),
 
         "val": T.Compose([T.ToTensor()])}
@@ -72,7 +72,7 @@ def main(args):
                                              collate_fn=val_dataset.collate_fn)
 
     model = create_model().to(device)
-    if args.use_dp == True:
+    if args.use_dp == True:#是否多GPU
         model = torch.nn.DataParallel(model).cuda()
 
     if args.weights != "":
@@ -81,7 +81,7 @@ def main(args):
         print(model.load_state_dict(weights_dict, strict=False))
 
 
-    pg = [p for p in model.parameters() if p.requires_grad]
+    pg = [p for p in model.parameters() if p.requires_grad]#收集所有需要更行的参数
     optimizer = optim.Adam(pg, lr=args.lr, betas=(0.9, 0.999), eps=1e-08, weight_decay=5E-5)
     lr_scheduler = create_lr_scheduler(optimizer, len(train_loader), args.epochs, warmup=True)
 
@@ -142,7 +142,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch-size', type=int, default=12)
     parser.add_argument('--lr', type=float, default=0.0001)
     parser.add_argument('--data-path', type=str,
-                        default="./dataset/lolv1")
+                        default="/root/autodl-tmp/dataset/LLLR/LOL/lol_dataset")
     parser.add_argument('--weights', type=str, default='',
                         help='initial weights path')
     parser.add_argument('--resume', default='', help='resume from checkpoint')

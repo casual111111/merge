@@ -4,7 +4,16 @@
     // 欲了解更多信息，请访问: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-
+        {
+            "name": "decom_train",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "/root/autodl-tmp/low-lightSR/Diff-Retinex-Plus/decom_tools/train_decom.py",
+            "console": "integratedTerminal",
+            "cwd": "/root/autodl-tmp/low-lightSR/Diff-Retinex-Plus",
+            "env": {
+                    "CUDA_VISIBLE_DEVICES": "0"}
+        },
         {
             "name": "test",
             "type": "debugpy",
@@ -12,10 +21,30 @@
             "program": "/root/autodl-tmp/low-lightSR/Diff-Retinex-Plus/test.py",
             "console": "integratedTerminal",
             "cwd": "/root/autodl-tmp/low-lightSR/Diff-Retinex-Plus",
+             "env": {
+                    "CUDA_VISIBLE_DEVICES": "0"},
             "args": [
-                         "-opt",
-                        "/root/autodl-tmp/low-lightSR/Diff-Retinex-Plus/options/test_diff_retinex_plus_lolv1.yml"
-]
+                "-opt",
+                "/root/autodl-tmp/low-lightSR/Diff-Retinex-Plus/options/test_diff_retinex_plus_lolv1.yml"
+            ]
+        },
+        {
+            "name": "diff_train",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "train.py",
+            "console": "integratedTerminal",
+            "cwd": "/root/autodl-tmp/low-lightSR/Diff-Retinex-Plus",
+            "args": [
+                "-opt",
+                "./options/train_diff_retinex_plus_lolv1.yml",
+                "--launcher",
+                "none"
+            ],
+            "env": {
+                "CUDA_VISIBLE_DEVICES": "0"
+            }
         }
+    
     ]
 }

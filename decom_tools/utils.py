@@ -16,8 +16,8 @@ from loss_decom_TDN import Decom_Loss
 def read_data(root: str):
     assert os.path.exists(root), "dataset root: {} does not exist.".format(root)
 
-    train_root = os.path.join(root, "train")
-    val_root = os.path.join(root, "test")
+    train_root = os.path.join(root, "our485")
+    val_root = os.path.join(root, "eval15")
     assert os.path.exists(train_root), "train root: {} does not exist.".format(train_root)
     assert os.path.exists(val_root), "val root: {} does not exist.".format(val_root)
 

@@ -10,3 +10,6 @@ __pycache__/
 
 # 日志文件（如果有）
 *.log
+experiments/*
+decom_tools/experiments/
+tb_logger/

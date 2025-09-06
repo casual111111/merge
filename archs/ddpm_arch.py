@@ -306,6 +306,11 @@ class GaussianDiffusion(nn.Module):
                     size=b
                 )
             ).to(x_start.device)
+            ##self.sqrt_alphas_cumprod_prev = “噪声调度查表器”（静态、离散）。
+
+             ##continuous_sqrt_alpha_cumprod = “实际采样到的噪声强度”（动态、连续、随 batch 变化）。
+
+            ##这样做的好处是：把离散的时间步 t 连续化，避免模型训练时只能看到少量固定噪声水平，提高泛化性
             continuous_sqrt_alpha_cumprod = continuous_sqrt_alpha_cumprod.view(
                 b, -1)
 

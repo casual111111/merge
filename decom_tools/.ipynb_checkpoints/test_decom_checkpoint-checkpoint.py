@@ -6,7 +6,7 @@ from PIL import Image
 from torchvision import transforms
 import matplotlib.pyplot as plt
 
-from decom_arch import DecomNet as create_model
+from TDN_network import DecomNet as create_model
 import math
 import numpy as np
 import cv2
@@ -20,7 +20,7 @@ def main():
     data_transform = transforms.Compose(
         [transforms.ToTensor()])
 
-    root = "/root/autodl-tmp/dataset/LLLR/LOL/lol_dataset/eval15/high"
+    root = "/data/xunpeng/Low_Light_datset/LOL-v1/eval15/high"
     assert os.path.exists(root), "file: '{}' dose not exist.".format(root)
 
     images_path=loadfiles(root=root)
@@ -30,7 +30,7 @@ def main():
     print("confirmly find {} images for computing".format(len(images_path)))
 
     model = create_model().to(device)
-    model_weight_path = "/root/autodl-tmp/low-lightSR/Diff-Retinex-Plus/decom_tools/experiments/TDN_train_20250902-202829/weights/checkpoint_Diff_TDN.pth"
+    model_weight_path = "/data/xunpeng/Diff-Retinex_plus_draw_pic/pic_draw/decom_weights/lolv1/lolv1_decom_checkpoint.pth"
     model.load_state_dict(torch.load(model_weight_path, map_location=device)['model'])
     model.eval()
     for img_path in images_path:
@@ -57,7 +57,7 @@ def savepic(outputpic, name, flag):
     outputpic = outputpic * 255.
     outputpic=outputpic[:, :, ::-1]
 
-    root = "./results/LOLv1/test/low"
+    root = "./results/LOLv2_syn/test/low"
     root_path = os.path.join(root, flag)
 
     if os.path.exists("./results") is False:
