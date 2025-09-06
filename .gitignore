@@ -12,4 +12,4 @@ __pycache__/
 *.log
 experiments/*
 decom_tools/experiments/
-tb_logger/
+tb_logger/IC-600x400/IC-FSRNet/pretrained_model1111/pretrained_model.zip
