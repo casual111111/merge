@@ -8,9 +8,9 @@
             "name": "decom_train",
             "type": "debugpy",
             "request": "launch",
-            "program": "/root/autodl-tmp/low-lightSR/Diff-Retinex-Plus/decom_tools/train_decom.py",
+            "program": "/root/autodl-tmp/low-lightSR/merge/diff_retinex/decom_tools/train_decom.py",
             "console": "integratedTerminal",
-            "cwd": "/root/autodl-tmp/low-lightSR/Diff-Retinex-Plus",
+            "cwd": "/root/autodl-tmp/low-lightSR/merge/diff_retinex",
             "env": {
                     "CUDA_VISIBLE_DEVICES": "0"}
         },
@@ -18,14 +18,14 @@
             "name": "test",
             "type": "debugpy",
             "request": "launch",
-            "program": "/root/autodl-tmp/low-lightSR/Diff-Retinex-Plus/test.py",
+            "program": "/root/autodl-tmp/low-lightSR/merge/diff_retinex/test.py",
             "console": "integratedTerminal",
-            "cwd": "/root/autodl-tmp/low-lightSR/Diff-Retinex-Plus",
+            "cwd": "/root/autodl-tmp/low-lightSR/merge/diff_retinex",
              "env": {
                     "CUDA_VISIBLE_DEVICES": "0"},
             "args": [
                 "-opt",
-                "/root/autodl-tmp/low-lightSR/Diff-Retinex-Plus/options/test_diff_retinex_plus_lolv1.yml"
+                "/root/autodl-tmp/low-lightSR/merge/diff_retinex/options/test_diff_retinex_plus_lolv1.yml"
             ]
         },
         {
@@ -34,7 +34,7 @@
             "request": "launch",
             "program": "train.py",
             "console": "integratedTerminal",
-            "cwd": "/root/autodl-tmp/low-lightSR/Diff-Retinex-Plus",
+            "cwd": "/root/autodl-tmp/low-lightSR/merge/diff_retinex",
             "args": [
                 "-opt",
                 "./options/train_diff_retinex_plus_lolv1.yml",
