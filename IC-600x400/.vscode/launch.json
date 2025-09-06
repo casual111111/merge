@@ -1,0 +1,28 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "train",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "/root/autodl-tmp/low-lightSR/IC-600x400/IC-FSRNet/train.py",
+      "console": "integratedTerminal",
+      "cwd": "/root/autodl-tmp/low-lightSR/IC-600x400/IC-FSRNet",
+      "env": {
+        "CUDA_VISIBLE_DEVICES": "0", 
+      },
+      "python": "/root/miniconda3/envs/brzo/bin/python",
+      "args": [
+        "--scale","4"
+      ]
+    },
+    {
+      "name": "test",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "/root/autodl-tmp/low-lightSR/IC-600x400/IC-FSRNet/test.py", // 替换为您的 test.py 文件路径
+      "console": "integratedTerminal",
+      "cwd": "/root/autodl-tmp/low-lightSR/IC-600x400/IC-FSRNet", // 设置工作目录为当前项目文件夹
+    }
+  ]
+}

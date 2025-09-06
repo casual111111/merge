@@ -1,0 +1,10 @@
+/IC-FSRNet/datasets/*
+/IC-FSRNet/experiment
+/IC-FSRNet/logs
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+/IC-FSRNet/pretrained_model/*
+
