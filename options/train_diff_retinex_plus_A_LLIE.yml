@@ -56,6 +56,12 @@ network_sr3unet:
   res_blocks: 2
   dropout: 0.1
   divide: 16
+  
+  
+#network icnet
+network_icnet:
+  type: ICNet
+
 
 network_consistentunet:
   type: DRNet_Retinex_time

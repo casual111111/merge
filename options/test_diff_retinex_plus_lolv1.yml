@@ -30,6 +30,12 @@ network_sr3unet:
   dropout: 0.1
   divide: 16
 
+#network icnet
+network_icnet:
+  type: ICNet
+
+
+
 # network structures
 network_consistentunet:
   type: DRNet_Retinex_time

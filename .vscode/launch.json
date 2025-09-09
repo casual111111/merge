@@ -12,7 +12,7 @@
             "console": "integratedTerminal",
             "cwd": "/root/autodl-tmp/low-lightSR/merge/diff_retinex",
             "env": {
-                    "CUDA_VISIBLE_DEVICES": "0"}
+                    "CUDA_VISIBLE_DEVICES": "1"}
         },
         {
             "name": "test",
@@ -22,7 +22,7 @@
             "console": "integratedTerminal",
             "cwd": "/root/autodl-tmp/low-lightSR/merge/diff_retinex",
              "env": {
-                    "CUDA_VISIBLE_DEVICES": "0"},
+                    "CUDA_VISIBLE_DEVICES": "1"},
             "args": [
                 "-opt",
                 "/root/autodl-tmp/low-lightSR/merge/diff_retinex/options/test_diff_retinex_plus_lolv1.yml"
@@ -42,7 +42,7 @@
                 "none"
             ],
             "env": {
-                "CUDA_VISIBLE_DEVICES": "0"
+                "CUDA_VISIBLE_DEVICES": "1"
             }
         }
     
