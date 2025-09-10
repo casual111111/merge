@@ -67,7 +67,8 @@ class GaussianDiffusion(nn.Module):
         loss_type='l1',
         conditional=True,
         schedule_opt=None,
-        restore_fn=None  # 保留参数以兼容外部 YAML，但内部不再使用
+        restore_fn=None,  # 保留参数以兼容外部 YAML，但内部不再使用
+        icnet=None  # 新增参数
     ):
         super().__init__()
         self.channels = channels
@@ -76,6 +77,7 @@ class GaussianDiffusion(nn.Module):
         self.restore_fn = None  # 显式禁用
         self.loss_type = loss_type
         self.conditional = conditional
+        self.icnet = icnet  # 保存 icnet
         if schedule_opt is not None:
             pass
 
@@ -285,7 +287,12 @@ class GaussianDiffusion(nn.Module):
         self.pred_noise = model_output
         self.x_recon = self.sqrt_recip_alphas_cumprod[t - 1] * x_noisy - self.sqrt_recipm1_alphas_cumprod[t - 1] * model_output
         self.x_recon = torch.clamp(self.x_recon, -1, 1)
+        # 调用 icnet
+        if self.icnet is not None:
+            self.x_recon_output = self.icnet(self.x_recon)
 
+        self.x_recon_output = torch.clamp(self.x_recon_output, 0, 1)
+        self.x_recon_output = self.norm_minus1_1(self.x_recon_output)
         # —— 训练端返回 (pred_noise, noise, x_recon) 与你训练代码对齐 —— #
         return self.pred_noise, self.noise, self.x_recon
 
