@@ -67,19 +67,21 @@ class GaussianDiffusion(nn.Module):
         loss_type='l1',
         conditional=True,
         schedule_opt=None,
-        restore_fn=None,  # 保留参数以兼容外部 YAML，但内部不再使用
+        restore_fn=None,
         icnet=None  # 新增参数
     ):
         super().__init__()
         self.channels = channels
         self.image_size = image_size
         self.denoise_fn = denoise_fn
-        self.restore_fn = None  # 显式禁用
+        self.restore_fn = restore_fn
         self.loss_type = loss_type
         self.conditional = conditional
         self.icnet = icnet  # 保存 icnet
         if schedule_opt is not None:
             pass
+        
+      
 
     def set_loss(self, device):
         if self.loss_type == 'l1':
@@ -267,18 +269,24 @@ class GaussianDiffusion(nn.Module):
         if not t_range:
             t_range = [1, self.num_timesteps]
         x_start = x_HR
-        b, c, h, w = x_start.shape
+        [b, c, h, w] = x_start.shape
 
-        # 采样连续噪声强度
         if different_t_in_one_batch:
-            t = torch.randint(0, self.num_timesteps, (b,)).long().to(x_start.device) + 1
-            continuous_sqrt_alpha_cumprod = self._extract(torch.from_numpy(self.sqrt_alphas_cumprod_prev),
-                                                          t, x_start.shape).view(b, -1)
+            t = torch.randint(0, self.num_timesteps, (b,)).long() + 1
+            t = t.to(x_start.device)
+            continuous_sqrt_alpha_cumprod = self._extract(torch.from_numpy(self.sqrt_alphas_cumprod_prev), t, x_start.shape)
+            continuous_sqrt_alpha_cumprod = continuous_sqrt_alpha_cumprod.view(b, -1)
         else:
             t = np.random.randint(t_range[0], t_range[1] + 1)
             continuous_sqrt_alpha_cumprod = torch.FloatTensor(
-                np.random.uniform(self.sqrt_alphas_cumprod_prev[t-1], self.sqrt_alphas_cumprod_prev[t], size=b)
-            ).to(x_start.device).view(b, -1)
+                np.random.uniform(
+                    self.sqrt_alphas_cumprod_prev[t-1],
+                    self.sqrt_alphas_cumprod_prev[t],
+                    size=b
+                )
+            ).to(x_start.device)
+            continuous_sqrt_alpha_cumprod = continuous_sqrt_alpha_cumprod.view(
+                b, -1)
 
         noise = default(noise, lambda: torch.randn_like(x_start))
         x_noisy = self.q_sample(
@@ -297,14 +305,19 @@ class GaussianDiffusion(nn.Module):
         self.pred_noise = model_output
         self.x_recon = self.sqrt_recip_alphas_cumprod[t - 1] * x_noisy - self.sqrt_recipm1_alphas_cumprod[t - 1] * model_output
         self.x_recon = torch.clamp(self.x_recon, -1, 1)
+
+        #restore_fn网络
+        self.x_recon_detach = self.x_recon.detach()
+        self.x_recon_output, supervised_l_list, supervised_r_list, l_MoE = self.restore_fn(self.norm_0_1(x_SR), self.norm_0_1(self.x_recon_detach),
+                                                                                            continuous_sqrt_alpha_cumprod)
         # 调用 icnet
         if self.icnet is not None:
-            self.x_recon_output = self.icnet(self.x_recon)
+            self.x_recon_output = self.icnet(self.x_recon_output)
 
         self.x_recon_output = torch.clamp(self.x_recon_output, 0, 1)
         self.x_recon_output = self.norm_minus1_1(self.x_recon_output)
         # —— 训练端返回 (pred_noise, noise, x_recon) 与你训练代码对齐 —— #
-        return self.pred_noise, self.noise, self.x_recon
+        return self.pred_noise, self.noise, self.x_recon_output, supervised_l_list, supervised_r_list, l_MoE
 
     def forward(self, x_HR, x_SR, train_type='ddpm', *args, **kwargs):
         kwargs_cp = kwargs.copy()

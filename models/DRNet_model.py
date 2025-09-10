@@ -50,14 +50,11 @@ class DRNetModel(BaseModel):
         #define icnet network
         self.icnet = build_network(opt['network_icnet'])#icnet网络
         self.icnet = self.model_to_device(self.icnet)
-        # 如果需要在扩散模型里访问icnet，直接挂属性（可选）
-        # if getattr(self, 'icnet', None) is not None:
-        #     bare = self.ddpm.module if isinstance(self.ddpm, (DataParallel, DistributedDataParallel)) else self.ddpm
-        #     bare.icnet = self.icnet
+        
         # define consistent-u-net network
-        # self.consistent_unet = build_network(opt['network_consistentunet'])#专家网络结合retinex网络
-        # self.consistent_unet = self.model_to_device(self.consistent_unet)
-        # opt['network_ddpm']['restore_fn'] = self.consistent_unet
+        self.consistent_unet = build_network(opt['network_consistentunet'])#专家网络结合retinex网络
+        self.consistent_unet = self.model_to_device(self.consistent_unet)
+        opt['network_ddpm']['restore_fn'] = self.consistent_unet
 
         self.ddpm = build_network(opt['network_ddpm'])#扩散模型采样
         self.ddpm = self.model_to_device(self.ddpm)
@@ -67,8 +64,8 @@ class DRNetModel(BaseModel):
             bare = self.ddpm.module if isinstance(self.ddpm, (DataParallel, DistributedDataParallel)) else self.ddpm
             bare.icnet = self.icnet
 
-        # self.decom_net = build_network(opt['network_decom'])#retinex网络
-        # self.decom_net = self.model_to_device(self.decom_net)
+        self.decom_net = build_network(opt['network_decom'])#retinex网络
+        self.decom_net = self.model_to_device(self.decom_net)
 
         if isinstance(self.ddpm, (DataParallel, DistributedDataParallel)):
             self.bare_ddpm_model = self.ddpm.module
@@ -92,32 +89,32 @@ class DRNetModel(BaseModel):
 
         logger = get_root_logger()
         is_train_mode = not self.opt['val'].get('test_flag', False)
-        # if is_train_mode:
-        #     assert os.path.exists(self.opt['network_decom']['path']), logger.info("The decom-network weights is not exsit.")
-        #     load_decom_path = self.opt['network_decom']['path']
-        #     if isinstance(self.decom_net, (DataParallel, DistributedDataParallel)):
-        #         logger.info(self.decom_net.module.load_state_dict(torch.load(load_decom_path, map_location='cuda')['model'], strict=True))
-        #     else:
-        #         logger.info(self.decom_net.load_state_dict(torch.load(load_decom_path, map_location='cuda')['model'], strict=True))
-        #     logger.info("Load the decom-net weight success! Setting --------> eval mode")
-        # else:
-        #     logger.info("Begin to eval the model!")
+        if is_train_mode:
+            assert os.path.exists(self.opt['network_decom']['path']), logger.info("The decom-network weights is not exsit.")
+            load_decom_path = self.opt['network_decom']['path']
+            if isinstance(self.decom_net, (DataParallel, DistributedDataParallel)):
+                logger.info(self.decom_net.module.load_state_dict(torch.load(load_decom_path, map_location='cuda')['model'], strict=True))
+            else:
+                logger.info(self.decom_net.load_state_dict(torch.load(load_decom_path, map_location='cuda')['model'], strict=True))
+            logger.info("Load the decom-net weight success! Setting --------> eval mode")
+        else:
+            logger.info("Begin to eval the model!")
 
-        # if isinstance(self.decom_net, (DataParallel, DistributedDataParallel)):
-        #     self.decom_net.module.requires_grad_(False)
-        #     self.decom_net.module.eval()
-        # else:
-        #     self.decom_net.requires_grad_(False)
-        #     self.decom_net.eval()
+        if isinstance(self.decom_net, (DataParallel, DistributedDataParallel)):
+            self.decom_net.module.requires_grad_(False)
+            self.decom_net.module.eval()
+        else:
+            self.decom_net.requires_grad_(False)
+            self.decom_net.eval()
 
-        # load_path = self.opt['path'].get('pretrain_network_ddpm', None)
-        # if load_path is not None:
-        #     if isinstance(self.decom_net, (DataParallel, DistributedDataParallel)):
-        #         param_key = self.opt['path'].get('param_key_ddpm', 'params')
-        #         self.load_network(self.ddpm, load_path, self.opt['path'].get('strict_load_ddpm', True), param_key)
-        #     else:
-        #         param_key = self.opt['path'].get('param_key_ddpm', 'params')
-        #         self.load_bare_network(self.bare_ddpm_model, load_path, self.opt['path'].get('strict_load_ddpm', True), param_key)
+        load_path = self.opt['path'].get('pretrain_network_ddpm', None)
+        if load_path is not None:
+            if isinstance(self.decom_net, (DataParallel, DistributedDataParallel)):
+                param_key = self.opt['path'].get('param_key_ddpm', 'params')
+                self.load_network(self.ddpm, load_path, self.opt['path'].get('strict_load_ddpm', True), param_key)
+            else:
+                param_key = self.opt['path'].get('param_key_ddpm', 'params')
+                self.load_bare_network(self.bare_ddpm_model, load_path, self.opt['path'].get('strict_load_ddpm', True), param_key)
 
     def init_training_settings(self):
         self.ddpm.train()
@@ -192,22 +189,17 @@ class DRNetModel(BaseModel):
 
     def optimize_parameters(self, current_iter):
         self.optimizer_g.zero_grad()
-        pred_noise, noise, x_recon_out = self.ddpm(self.norm_minus1_1(self.gt), self.norm_minus1_1(self.lq),
+        pred_noise, noise, x_recon_out, supervised_l_list, supervised_r_list, l_MoE = self.ddpm(self.norm_minus1_1(self.gt), self.norm_minus1_1(self.lq),
                   train_type=self.opt['train'].get('train_type', None),
                   different_t_in_one_batch=self.opt['train'].get('different_t_in_one_batch', None),
                   clip_noise=self.opt['train'].get('clip_noise', None),
                   t_range=self.opt['train'].get('t_range', None),
                   frozen_denoise=self.opt['train'].get('frozen_denoise', None))
 
-        # if isinstance(out, tuple):
-        #     pred_noise, noise, x_recon_out = out[:3]
-        # else:
-        #     pred_noise, noise, x_recon_out = None, None, out
+        supervised_l_list = [F.interpolate(output, size=self.gt.shape[2:], mode='bilinear', align_corners=False) for output in supervised_l_list]
+        supervised_r_list = [F.interpolate(output, size=self.gt.shape[2:], mode='bilinear', align_corners=False) for output in supervised_r_list]
 
-        # supervised_l_list = [F.interpolate(output, size=self.gt.shape[2:], mode='bilinear', align_corners=False) for output in supervised_l_list]
-        # supervised_r_list = [F.interpolate(output, size=self.gt.shape[2:], mode='bilinear', align_corners=False) for output in supervised_r_list]
-
-        # r_gt, l_gt = self.decom_net(self.gt)
+        r_gt, l_gt = self.decom_net(self.gt)
 
         x_recon_out = self.norm_0_1(x_recon_out)
 
@@ -216,15 +208,15 @@ class DRNetModel(BaseModel):
 
         l_diff = F.l1_loss(pred_noise, noise)
         l_l1 = F.l1_loss(x_recon_out, self.gt)
-        # l_retinex_l = [F.l1_loss(l, l_gt) for l in supervised_l_list]
-        # l_retinex_r = [F.l1_loss(r, r_gt) for r in supervised_r_list]
-        # l_retinex = 0.5 * sum(l_retinex_l) + sum(l_retinex_r)
+        l_retinex_l = [F.l1_loss(l, l_gt) for l in supervised_l_list]
+        l_retinex_r = [F.l1_loss(r, r_gt) for r in supervised_r_list]
+        l_retinex = 0.5 * sum(l_retinex_l) + sum(l_retinex_r)
 
-        l_total += l_l1  + l_diff 
+        l_total += l_l1 + 0.2 * l_retinex + l_diff + l_MoE
         loss_dict['l_l1'] = l_l1
         loss_dict['l_diff'] = l_diff
-        # loss_dict['l_retinex'] = l_retinex
-        # loss_dict['l_MoE'] = l_MoE
+        loss_dict['l_retinex'] = l_retinex
+        loss_dict['l_MoE'] = l_MoE
         loss_dict['l_total'] = l_total
         l_total.backward()
         self.optimizer_g.step()
