@@ -151,82 +151,92 @@ class GaussianDiffusion(nn.Module):
         return_pred_noise=False,
         return_all=False,
         pred_type='noise',
-        clip_noise=False
-    ):
-        if return_all:
-            assert not (return_x_recon or return_pred_noise), "[return_x_recon, return_pred_noise, return_all] 只能开一个"
-        assert not (return_x_recon and return_pred_noise), "[return_x_recon, return_pred_noise] 只能开一个"
+        clip_noise=False):
 
-        # 1) DDIM 步长
+        if return_all:
+            assert not (return_x_recon or return_pred_noise), "[return_x_recon, return_pred_noise, return_all], choose one or not!"
+        assert not (return_x_recon and return_pred_noise), "[return_x_recon, return_pred_noise, return_all], choose one or not!"
+        # make ddim timestep sequence
         if ddim_discr_method == 'uniform':
             c = self.num_timesteps // ddim_timesteps
             ddim_timestep_seq = list(reversed(range(self.num_timesteps - 1, -1, -c)))
-            ddim_timestep_seq = np.asarray(ddim_timestep_seq)
+            ddim_timestep_seq = np.asarray(ddim_timestep_seq)#变成numpy数组
         elif ddim_discr_method == 'quad':
-            ddim_timestep_seq = ((np.linspace(0, np.sqrt(self.num_timesteps * .8), ddim_timesteps)) ** 2).astype(int)
+            ddim_timestep_seq = (
+                (np.linspace(0, np.sqrt(self.num_timesteps * .8), ddim_timesteps)) ** 2
+            ).astype(int)
         else:
-            raise NotImplementedError(f'Unknown ddim discretization: {ddim_discr_method}')
+            raise NotImplementedError(f'There is no ddim discretization method called "{ddim_discr_method}"')
 
+        # previous sequence
         ddim_timestep_prev_seq = np.append(np.array([-1]), ddim_timestep_seq[:-1])
-
+        
         device = x_in.device
         b, c, h, w = x_in[:, :3, :, :].shape
-        init_h, init_w = h, w
-
-        # 2) 初始噪声
+        init_h = h
+        init_w = w
+        # start from pure noise (for each example in the batch)
         sample_img = torch.randn((b, c, init_h, init_w), device=device)
-
-        # 3) 过程记录（可选）
-        sample_inter = (1 | (ddim_timesteps // 10))
+        sample_inter = (1 | (ddim_timesteps//10))
         ret_img = x_in[:, :3, :, :]
-
         for i in tqdm(reversed(range(0, ddim_timesteps)), desc='sampling loop time step', total=ddim_timesteps):
             if return_all and i % sample_inter == 0:
                 all_process = [F.interpolate(sample_img, (h, w))]
-
             t = torch.full((b,), ddim_timestep_seq[i], device=device, dtype=torch.long)
-            noise_level = torch.FloatTensor([self.sqrt_alphas_cumprod_prev[t + 1]]).repeat(b, 1).to(device)
+
+            noise_level = torch.FloatTensor([self.sqrt_alphas_cumprod_prev[t + 1]]).repeat(b, 1).to(device)#这里是第t步
 
             prev_t = torch.full((b,), ddim_timestep_prev_seq[i], device=device, dtype=torch.long)
-            alpha_cumprod_t = self._extract(self.alphas_cumprod, t, sample_img.shape)
+            
+            # get current and previous alpha_cumprod
+            alpha_cumprod_t = self._extract(self.alphas_cumprod, t, sample_img.shape)#每个像素的aerfa系数
             if i == 0:
                 alpha_cumprod_t_prev = torch.ones_like(alpha_cumprod_t)
             else:
                 alpha_cumprod_t_prev = self._extract(self.alphas_cumprod, prev_t, sample_img.shape)
 
             if pred_type == 'noise':
-                # 2. 预测噪声
-                pred_noise = self.denoise_fn(torch.cat([F.interpolate(x_in, sample_img.shape[2:]), sample_img], dim=1),
-                                             noise_level)
+                # 2. predict noise using model
+                pred_noise = self.denoise_fn(torch.cat([F.interpolate(x_in, sample_img.shape[2:]), sample_img], dim=1), noise_level)
                 if clip_noise:
                     pred_noise = torch.clamp(pred_noise, -1, 1)
-                # 3. 反推 x_0（在 [-1,1]）
+                
+                # 3. get the predicted x_0
                 pred_x0 = (sample_img - torch.sqrt((1. - alpha_cumprod_t)) * pred_noise) / torch.sqrt(alpha_cumprod_t)
             else:
-                raise AssertionError("only pred noise is supported currently")
+                assert False, "only pred noise"
 
             if return_all and i % sample_inter == 0:
                 all_process.append(F.interpolate(pred_x0, (h, w)))
-
+            
             pred_x0.clamp_(-1., 1.)
-
+            
             if return_all and i % sample_inter == 0:
                 all_process.append(F.interpolate(pred_x0, (h, w)))
 
             if clip_denoised:
                 pred_x0 = torch.clamp(pred_x0, min=-1., max=1.)
+            
+            sample_already = False
 
-            # —— 注意：这里不再调用 restore_fn —— #
-            supervised_l_list, supervised_r_list = None, None
+            ##########icnet##########
+            # pred_x0, supervised_l_list, supervised_r_list, _ = self.restore_fn(self.norm_0_1(x_in), self.norm_0_1(pred_x0), noise_level)
+            if self.icnet is not None:
+                pred_x0 = self.icnet(pred_x0)
+            pred_x0.clamp_(0., 1.)
 
-            # DDIM 更新
-            sigmas_t = ddim_eta * torch.sqrt(
-                (1 - alpha_cumprod_t_prev) / (1 - alpha_cumprod_t) * (1 - alpha_cumprod_t / alpha_cumprod_t_prev)
-            )
-            pred_dir_xt = torch.sqrt(1 - alpha_cumprod_t_prev - sigmas_t**2) * pred_noise
-            x_prev = torch.sqrt(alpha_cumprod_t_prev) * pred_x0 + pred_dir_xt + sigmas_t * torch.randn_like(pred_x0)
-            sample_img = x_prev
+            pred_x0 = self.norm_minus1_1(pred_x0)
+            
+            if not sample_already:
+                sigmas_t = ddim_eta * torch.sqrt(
+                    (1 - alpha_cumprod_t_prev) / (1 - alpha_cumprod_t) * (1 - alpha_cumprod_t / alpha_cumprod_t_prev))
 
+                pred_dir_xt = torch.sqrt(1 - alpha_cumprod_t_prev - sigmas_t**2) * pred_noise
+
+                x_prev = torch.sqrt(alpha_cumprod_t_prev) * pred_x0 + pred_dir_xt + sigmas_t * torch.randn_like(pred_x0)
+
+                sample_img = x_prev
+            
             if return_all and i % sample_inter == 0:
                 all_process.append(F.interpolate(sample_img, (h, w)))
 
@@ -239,11 +249,11 @@ class GaussianDiffusion(nn.Module):
                     ret_img = torch.cat([ret_img, torch.cat(all_process, dim=0)], dim=0)
                 else:
                     ret_img = torch.cat([ret_img, F.interpolate(sample_img, (h, w))], dim=0)
-
+        
         if continous:
-            return ret_img, supervised_l_list, supervised_r_list
+            return ret_img
         else:
-            return sample_img, supervised_l_list, supervised_r_list
+            return sample_img
 
     def q_sample(self, x_start, continuous_sqrt_alpha_cumprod, noise=None):
         noise = default(noise, lambda: torch.randn_like(x_start))

@@ -192,17 +192,17 @@ class DRNetModel(BaseModel):
 
     def optimize_parameters(self, current_iter):
         self.optimizer_g.zero_grad()
-        out = self.ddpm(self.norm_minus1_1(self.gt), self.norm_minus1_1(self.lq),
+        pred_noise, noise, x_recon_out = self.ddpm(self.norm_minus1_1(self.gt), self.norm_minus1_1(self.lq),
                   train_type=self.opt['train'].get('train_type', None),
                   different_t_in_one_batch=self.opt['train'].get('different_t_in_one_batch', None),
                   clip_noise=self.opt['train'].get('clip_noise', None),
                   t_range=self.opt['train'].get('t_range', None),
                   frozen_denoise=self.opt['train'].get('frozen_denoise', None))
 
-        if isinstance(out, tuple):
-            pred_noise, noise, x_recon_out = out[:3]
-        else:
-            pred_noise, noise, x_recon_out = None, None, out
+        # if isinstance(out, tuple):
+        #     pred_noise, noise, x_recon_out = out[:3]
+        # else:
+        #     pred_noise, noise, x_recon_out = None, None, out
 
         # supervised_l_list = [F.interpolate(output, size=self.gt.shape[2:], mode='bilinear', align_corners=False) for output in supervised_l_list]
         # supervised_r_list = [F.interpolate(output, size=self.gt.shape[2:], mode='bilinear', align_corners=False) for output in supervised_r_list]
@@ -214,19 +214,17 @@ class DRNetModel(BaseModel):
         l_total = 0
         loss_dict = OrderedDict()
 
+        l_diff = F.l1_loss(pred_noise, noise)
         l_l1 = F.l1_loss(x_recon_out, self.gt)
-        loss_dict['l_l1'] = l_l1
-        l_total += l_l1
-
-        if (pred_noise is not None) and (noise is not None):
-            l_diff = F.l1_loss(pred_noise, noise)
-            loss_dict['l_diff'] = l_diff
-            l_total += l_diff
         # l_retinex_l = [F.l1_loss(l, l_gt) for l in supervised_l_list]
         # l_retinex_r = [F.l1_loss(r, r_gt) for r in supervised_r_list]
         # l_retinex = 0.5 * sum(l_retinex_l) + sum(l_retinex_r)
 
-        # l_total += l_l1 + 0.2 * l_retinex + l_diff + l_MoE
+        l_total += l_l1  + l_diff 
+        loss_dict['l_l1'] = l_l1
+        loss_dict['l_diff'] = l_diff
+        # loss_dict['l_retinex'] = l_retinex
+        # loss_dict['l_MoE'] = l_MoE
         loss_dict['l_total'] = l_total
         l_total.backward()
         self.optimizer_g.step()
@@ -256,7 +254,7 @@ class DRNetModel(BaseModel):
     def test(self):
         """Robust test() that matches training I/O and works whether ddim_sample returns:
         - Tensor (sr)
-        - Tuple (sr, [l_list], [r_list])  from old Retinex branch
+        - Tuple (sr, [l_list], [r_list]) from old Retinex branch
         - Dict with keys like 'sr', 'pred_noise', 'noise', 'x_recon'
         """
         with torch.no_grad():
@@ -264,23 +262,19 @@ class DRNetModel(BaseModel):
 
             # 读取验证期可选项
             val_opt = self.opt.get('val', {}) if hasattr(self, 'opt') else {}
-            out = self.bare_ddpm_model.ddim_sample(
-                self.norm_minus1_1(self.lq),
-                continous=val_opt.get('ret_process', False),
-                ddim_timesteps=val_opt.get('ddim_timesteps', 25),
-                return_pred_noise=val_opt.get('return_pred_noise', False),
-                return_x_recon=val_opt.get('ret_x_recon', False),
-                ddim_discr_method=val_opt.get('ddim_discr_method', 'uniform'),
-                ddim_eta=val_opt.get('ddim_eta', 0.0),
-                pred_type=val_opt.get('pred_type', 'noise'),
-                clip_noise=val_opt.get('clip_noise', False),
-                return_all=val_opt.get('ret_all', False),
-            )
+            out = self.bare_ddpm_model.ddim_sample(self.norm_minus1_1(self.lq),
+                                                    continous=self.opt['val'].get('ret_process', False), 
+                                                    ddim_timesteps=self.opt['val'].get('ddim_timesteps', 25),
+                                                    return_pred_noise=self.opt['val'].get('return_pred_noise', False),
+                                                    return_x_recon=self.opt['val'].get('ret_x_recon', False),
+                                                    ddim_discr_method=self.opt['val'].get('ddim_discr_method', 'uniform'),
+                                                    ddim_eta=self.opt['val'].get('ddim_eta', 0.0),
+                                                    pred_type=self.opt['val'].get('pred_type', 'noise'),
+                                                    clip_noise=self.opt['val'].get('clip_noise', False),
+                                                    return_all=self.opt['val'].get('ret_all', False))
 
             # 先清空缓存字段
             self.diff_sr = None
-            self.supervised_l_list = None
-            self.supervised_r_list = None
             self.pred_noise = None
             self.noise = None
             self.x_recon = None
@@ -292,16 +286,17 @@ class DRNetModel(BaseModel):
                 self.pred_noise = out.get('pred_noise', None)
                 self.noise = out.get('noise', None)
                 self.x_recon = out.get('x_recon', None)
-                # 可能存在旧分解产物（可选）
-                self.supervised_l_list = out.get('l_list', None)
-                self.supervised_r_list = out.get('r_list', None)
+                # 注释掉不需要的返回
+                # self.supervised_l_list = out.get('l_list', None)
+                # self.supervised_r_list = out.get('r_list', None)
             elif isinstance(out, (list, tuple)):
                 # 旧接口：一般为 (sr, l_list, r_list)；也可能只有 (sr,)
                 self.diff_sr = out[0]
-                if len(out) > 1 and isinstance(out[1], (list, tuple)):
-                    self.supervised_l_list = out[1]
-                if len(out) > 2 and isinstance(out[2], (list, tuple, torch.Tensor)):
-                    self.supervised_r_list = out[2]
+                # 注释掉不需要的返回
+                # if len(out) > 1 and isinstance(out[1], (list, tuple)):
+                #     self.supervised_l_list = out[1]
+                # if len(out) > 2 and isinstance(out[2], (list, tuple, torch.Tensor)):
+                #     self.supervised_r_list = out[2]
             else:
                 # 单张 SR Tensor
                 self.diff_sr = out
@@ -318,6 +313,7 @@ class DRNetModel(BaseModel):
                 self.gt = pad_tensor_back(self.gt, self.pad_left, self.pad_right, self.pad_top, self.pad_bottom)
 
             self.bare_ddpm_model.train()
+
 
 
     def nondist_validation(self, dataloader, current_iter, tb_logger, save_img, test=False):
@@ -396,7 +392,16 @@ class DRNetModel(BaseModel):
 
             self._log_validation_metric_values(current_iter, dataset_name, tb_logger)
 
-
+    def _log_validation_metric_values(self, current_iter, dataset_name, tb_logger):
+            logger = get_root_logger()
+            log_str = f'Validation {dataset_name}\n'
+            for metric, value in self.metric_results.items():
+                log_str += f'\t # {metric}: {value:.4f}\n'
+            logger.info(log_str)
+            
+            if tb_logger:
+                for metric, value in self.metric_results.items():
+                    tb_logger.add_scalar(f'metrics/{metric}', value, current_iter)
     def get_current_visuals(self):
         out_dict = OrderedDict()
         out_dict['gt'] = self.gt.detach().cpu()
