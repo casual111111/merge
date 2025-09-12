@@ -154,7 +154,10 @@ def parse_options(root_path, is_train=True):
             opt['path'][key] = osp.expanduser(val)
 
     if is_train:
-        experiments_root = osp.join(root_path, 'experiments', opt['name'])
+        # 添加可配置的实验文件夹名称，默认为实验名称
+        # exp_folder和tb_folder使用同一个参数
+        folder_name = opt.get('folder_name', opt['name'])
+        experiments_root = osp.join(root_path, 'experiments', folder_name)
         opt['path']['experiments_root'] = experiments_root
         opt['path']['models'] = osp.join(experiments_root, 'models')
         opt['path']['training_states'] = osp.join(experiments_root, 'training_states')
