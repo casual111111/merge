@@ -39,7 +39,7 @@
                 "-opt",
                 "/root/autodl-tmp/low-lightSR/merge/diff_retinex/options/train_diff_retinex_plus_lolv1.yml",
                 "--force_yml",
-                "folder_name=no_re",
+                "folder_name=all_diff_re_ic",
                 "--launcher",
                 "none"
             ],
