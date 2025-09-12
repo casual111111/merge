@@ -38,6 +38,7 @@
             "args": [
                 "-opt",
                 "/root/autodl-tmp/low-lightSR/merge/diff_retinex/options/train_diff_retinex_plus_lolv1.yml",
+                "folder_name=my_custom_experiment_name",
                 "--launcher",
                 "none"
             ],
