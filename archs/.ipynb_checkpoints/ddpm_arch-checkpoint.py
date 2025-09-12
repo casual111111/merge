@@ -198,12 +198,12 @@ class GaussianDiffusion(nn.Module):
                 alpha_cumprod_t_prev = self._extract(self.alphas_cumprod, prev_t, sample_img.shape)
 
             if pred_type == 'noise':
-                # 2. predict noise using model 噪声估计
+                # 2. predict noise using model
                 pred_noise = self.denoise_fn(torch.cat([F.interpolate(x_in, sample_img.shape[2:]), sample_img], dim=1), noise_level)
                 if clip_noise:
                     pred_noise = torch.clamp(pred_noise, -1, 1)
                 
-                # 3. get the predicted x_0 预测x0
+                # 3. get the predicted x_0
                 pred_x0 = (sample_img - torch.sqrt((1. - alpha_cumprod_t)) * pred_noise) / torch.sqrt(alpha_cumprod_t)
             else:
                 assert False, "only pred noise"
@@ -222,11 +222,9 @@ class GaussianDiffusion(nn.Module):
             sample_already = False
 
             ##########icnet##########
-            pred_x0, supervised_l_list, supervised_r_list, _ = self.restore_fn(self.norm_0_1(x_in), self.norm_0_1(pred_x0), noise_level)
-            pred_x0.clamp_(0., 1.)
-
+            # pred_x0, supervised_l_list, supervised_r_list, _ = self.restore_fn(self.norm_0_1(x_in), self.norm_0_1(pred_x0), noise_level)
             if self.icnet is not None:
-                pred_x0 = self.icnet(self.norm_0_1(x_in), self.norm_0_1(pred_x0), noise_level)
+                pred_x0 = self.icnet(pred_x0)
             pred_x0.clamp_(0., 1.)
 
             pred_x0 = self.norm_minus1_1(pred_x0)

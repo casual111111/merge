@@ -82,7 +82,7 @@ class LFSRNet(nn.Module):
         self.noise_level_mlp = NoiseLevelMLP(args.n_feats)
         
         ## light FSRNet
-        self.head = nn.Sequential(*[nn.Conv2d(in_channels=3, out_channels=args.n_feats, kernel_size=3, stride=1, padding=1), nn.ReLU(True)])
+        self.head = nn.Sequential(*[nn.Conv2d(in_channels=9, out_channels=args.n_feats, kernel_size=3, stride=1, padding=1), nn.ReLU(True)])
         
         # 为不同层级添加噪声调制层
         self.t_enc_layer1 = FeatureWiseAffine(args.n_feats, args.n_feats)
@@ -160,14 +160,15 @@ class LFSRNet(nn.Module):
         #///////////////////////600x400/////////////////////////////////////
         # 噪声调制：将时间步编码为噪声特征
         t = self.noise_level_mlp(time)
-        img=x
+        #取前三个通道
+        img=x[:, :3, :, :]
         x= torch.cat((x, diff_img), 1)
         B,C,H,W=x.shape
         
         # 特征提取和引导图生成
         grid = self.FENet(img)#（Encoder +Illumination Estimation=B）(1.64,16,16)//(64,624,624)//（64，64，64）
         guidance = self.GNet(img)#生成各个尺度的引导图G
-        save_x = x  
+        save_x = img 
         
         # 初始特征提取和噪声调制
         feature = self.head(x)#F0SR (1, 64, 400, 600)///
