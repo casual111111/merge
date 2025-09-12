@@ -222,8 +222,8 @@ class GaussianDiffusion(nn.Module):
             sample_already = False
 
             ##########icnet##########
-            pred_x0, supervised_l_list, supervised_r_list, _ = self.restore_fn(self.norm_0_1(x_in), self.norm_0_1(pred_x0), noise_level)
-            pred_x0.clamp_(0., 1.)
+            # pred_x0, supervised_l_list, supervised_r_list, _ = self.restore_fn(self.norm_0_1(x_in), self.norm_0_1(pred_x0), noise_level)
+            # pred_x0.clamp_(0., 1.)
 
             if self.icnet is not None:
                 pred_x0 = self.icnet(self.norm_0_1(x_in), self.norm_0_1(pred_x0), noise_level)
@@ -309,21 +309,21 @@ class GaussianDiffusion(nn.Module):
         self.x_recon = torch.clamp(self.x_recon, -1, 1)
 
         #restore_fn网络
-        self.x_recon_detach = self.x_recon.detach()
-        self.x_recon_output, supervised_l_list, supervised_r_list, l_MoE = self.restore_fn(self.norm_0_1(x_SR), self.norm_0_1(self.x_recon_detach),
-                                                                                            continuous_sqrt_alpha_cumprod)
+        # self.x_recon_detach = self.x_recon.detach()
+        # self.x_recon_output, supervised_l_list, supervised_r_list, l_MoE = self.restore_fn(self.norm_0_1(x_SR), self.norm_0_1(self.x_recon_detach),
+        #                                                                                     continuous_sqrt_alpha_cumprod)
         
-        self.x_recon_output = torch.clamp(self.x_recon_output, -1, 1)
-        self.x_recon_output_detach = self.x_recon_output.detach()
+        # self.x_recon_output = torch.clamp(self.x_recon_output, -1, 1)
+        self.x_recon_detach = self.x_recon.detach()
         # 调用 icnet
         if self.icnet is not None:
-            self.x_ic_output = self.icnet(self.norm_0_1(x_SR), self.norm_0_1(self.x_recon_output_detach),
+            self.x_ic_output = self.icnet(self.norm_0_1(x_SR), self.norm_0_1(self.x_recon_detach),
                                                                                             continuous_sqrt_alpha_cumprod)
 
         self.x_ic_output = torch.clamp(self.x_ic_output, 0, 1)
         self.x_ic_output = self.norm_minus1_1(self.x_ic_output)
         # —— 训练端返回 (pred_noise, noise, x_recon) 与你训练代码对齐 —— #
-        return self.pred_noise, self.noise, self.x_ic_output, supervised_l_list, supervised_r_list, l_MoE
+        return self.pred_noise, self.noise, self.x_ic_output
 
     def forward(self, x_HR, x_SR, train_type='ddpm', *args, **kwargs):
         kwargs_cp = kwargs.copy()

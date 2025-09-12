@@ -189,17 +189,17 @@ class DRNetModel(BaseModel):
 
     def optimize_parameters(self, current_iter):
         self.optimizer_g.zero_grad()
-        pred_noise, noise, x_recon_out, supervised_l_list, supervised_r_list, l_MoE = self.ddpm(self.norm_minus1_1(self.gt), self.norm_minus1_1(self.lq),
+        pred_noise, noise, x_recon_out = self.ddpm(self.norm_minus1_1(self.gt), self.norm_minus1_1(self.lq),
                   train_type=self.opt['train'].get('train_type', None),
                   different_t_in_one_batch=self.opt['train'].get('different_t_in_one_batch', None),
                   clip_noise=self.opt['train'].get('clip_noise', None),
                   t_range=self.opt['train'].get('t_range', None),
                   frozen_denoise=self.opt['train'].get('frozen_denoise', None))
 
-        supervised_l_list = [F.interpolate(output, size=self.gt.shape[2:], mode='bilinear', align_corners=False) for output in supervised_l_list]
-        supervised_r_list = [F.interpolate(output, size=self.gt.shape[2:], mode='bilinear', align_corners=False) for output in supervised_r_list]
+        # supervised_l_list = [F.interpolate(output, size=self.gt.shape[2:], mode='bilinear', align_corners=False) for output in supervised_l_list]
+        # supervised_r_list = [F.interpolate(output, size=self.gt.shape[2:], mode='bilinear', align_corners=False) for output in supervised_r_list]
 
-        r_gt, l_gt = self.decom_net(self.gt)
+        # r_gt, l_gt = self.decom_net(self.gt)
 
         x_recon_out = self.norm_0_1(x_recon_out)
 
@@ -208,15 +208,15 @@ class DRNetModel(BaseModel):
 
         l_diff = F.l1_loss(pred_noise, noise)
         l_l1 = F.l1_loss(x_recon_out, self.gt)
-        l_retinex_l = [F.l1_loss(l, l_gt) for l in supervised_l_list]
-        l_retinex_r = [F.l1_loss(r, r_gt) for r in supervised_r_list]
-        l_retinex = 0.5 * sum(l_retinex_l) + sum(l_retinex_r)
+        # l_retinex_l = [F.l1_loss(l, l_gt) for l in supervised_l_list]
+        # l_retinex_r = [F.l1_loss(r, r_gt) for r in supervised_r_list]
+        # l_retinex = 0.5 * sum(l_retinex_l) + sum(l_retinex_r)
 
-        l_total += l_l1 + 0.2 * l_retinex + l_diff + l_MoE
+        l_total += l_l1 + l_diff
         loss_dict['l_l1'] = l_l1
         loss_dict['l_diff'] = l_diff
-        loss_dict['l_retinex'] = l_retinex
-        loss_dict['l_MoE'] = l_MoE
+        # loss_dict['l_retinex'] = l_retinex
+        # loss_dict['l_MoE'] = l_MoE
         loss_dict['l_total'] = l_total
         l_total.backward()
         self.optimizer_g.step()
