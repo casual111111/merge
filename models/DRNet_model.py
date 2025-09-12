@@ -33,8 +33,8 @@ class ICNet(nn.Module):
         args = SimpleNamespace(n_feats=n_feats, device=device, **kwargs)
         self.net = LFSRNet(args)
 
-    def forward(self, x):
-        return self.net(x)
+    def forward(self, x, diff_img, time):
+        return self.net(x, diff_img, time)
 
 
 @MODEL_REGISTRY.register()

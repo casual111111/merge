@@ -37,12 +37,12 @@
             "cwd": "/root/autodl-tmp/low-lightSR/merge/diff_retinex",
             "args": [
                 "-opt",
-                "./options/train_diff_retinex_plus_lolv1.yml",
+                "/root/autodl-tmp/low-lightSR/merge/diff_retinex/options/train_diff_retinex_plus_lolv1.yml",
                 "--launcher",
                 "none"
             ],
             "env": {
-                "CUDA_VISIBLE_DEVICES": "1"
+                "CUDA_VISIBLE_DEVICES": "2"
             }
         }
     
