@@ -314,11 +314,11 @@ class GaussianDiffusion(nn.Module):
                                                                                             continuous_sqrt_alpha_cumprod)
         
         self.x_recon_output = torch.clamp(self.x_recon_output, -1, 1)
-        self.x_recon_output_detach = self.x_recon_output.detach()
+        
         # 调用 icnet
         if self.icnet is not None:
-            self.x_ic_output = self.icnet(self.norm_0_1(x_SR), self.norm_0_1(self.x_recon_output_detach),
-                                                                                            continuous_sqrt_alpha_cumprod)
+            self.x_ic_output = self.icnet(self.norm_0_1(x_SR), self.norm_0_1(self.self.x_recon_output,
+                                                                                            continuous_sqrt_alpha_cumprod))
 
         self.x_ic_output = torch.clamp(self.x_ic_output, 0, 1)
         self.x_ic_output = self.norm_minus1_1(self.x_ic_output)
