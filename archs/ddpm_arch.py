@@ -255,9 +255,9 @@ class GaussianDiffusion(nn.Module):
                     ret_img = torch.cat([ret_img, F.interpolate(sample_img, (h, w))], dim=0)
         
         if continous:
-            return ret_img
+            return ret_img, supervised_l_list, supervised_r_list
         else:
-            return sample_img
+            return sample_img, supervised_l_list, supervised_r_list
 
     def q_sample(self, x_start, continuous_sqrt_alpha_cumprod, noise=None):
         noise = default(noise, lambda: torch.randn_like(x_start))
