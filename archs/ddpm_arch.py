@@ -223,12 +223,12 @@ class GaussianDiffusion(nn.Module):
 
             ##########icnet##########
             pred_x0, supervised_l_list, supervised_r_list, _ = self.restore_fn(self.norm_0_1(x_in), self.norm_0_1(pred_x0), noise_level)
-            pred_x0.clamp_(0., 1.)
-
+            
+            pred_x0.clamp_(-1., 1.)
             if self.icnet is not None:
                 pred_x0 = self.icnet(self.norm_0_1(x_in), self.norm_0_1(pred_x0), noise_level)
+            
             pred_x0.clamp_(0., 1.)
-
             pred_x0 = self.norm_minus1_1(pred_x0)
             
             if not sample_already:
