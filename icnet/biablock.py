@@ -2,6 +2,7 @@ import torch.nn as nn
 import torch
 from icnet import common
 import torch.nn.functional as F
+from icnet.noise_modules import FeatureWiseAffine
 
 class Slice(nn.Module):
     def __init__(self):
@@ -96,3 +97,69 @@ class Biablock(nn.Module):
         res = self.body(x, guide, coeffs)
 
         return res
+
+class Biablock_time(nn.Module):
+    """时间感知的Biablock，支持噪声调制"""
+    def __init__(self, args):
+        super(Biablock_time, self).__init__()
+        self.body = BiaGroup_time(args)
+    def forward(self, x, guide, coeffs, time):
+        res = self.body(x, guide, coeffs, time)
+        return res
+
+class BiaGroup_time(nn.Module):
+    """时间感知的BiaGroup"""
+    def __init__(self, args):
+        super(BiaGroup_time, self).__init__()
+        modules_body = []
+        for _ in range(args.n_resblocks):
+            modules_body.append(BasicBlock2_time(args))
+
+        self.tail = common.ConvBNReLU2D(args.n_feats, args.n_feats, kernel_size=3, padding=1, act=args.act)
+        self.body = nn.Sequential(*modules_body)
+        self.re_scale = Scale(1)
+        
+        # 添加时间调制层
+        self.time_modulation = FeatureWiseAffine(args.n_feats, args.n_feats)
+
+    def forward(self, x, guidance, grid, time):
+        res = x
+        for i in range(len(self.body)):
+            res = self.body[i](res, guidance, grid, time)
+        res = self.tail(res)
+        # 应用时间调制
+        res = self.time_modulation(res, time)
+        return res + self.re_scale(x)
+
+class BasicBlock2_time(nn.Module):
+    """时间感知的BasicBlock2"""
+    def __init__(self, args):
+        super(BasicBlock2_time, self).__init__()
+
+        self.conv1 = nn.Conv2d(in_channels=args.n_feats, out_channels=args.n_feats, kernel_size=3, stride=1, padding=1)
+        self.conv2 = nn.Conv2d(in_channels=args.n_feats, out_channels=args.n_feats, kernel_size=3, stride=1, padding=1)
+        self.relu = nn.ReLU(True)
+
+        self.basic1 = common.RCAB(args.n_feats)
+
+        self.slice = Slice()
+        self.adjust = nn.Sequential(*[nn.Conv2d(in_channels=args.n_feats, out_channels=args.n_feats, kernel_size=3, stride=1, padding=1), nn.Sigmoid()])
+        self.apply_coeffs = ApplyCoeffs_adIllu()
+        
+        # 添加时间调制层
+        self.time_modulation = FeatureWiseAffine(args.n_feats, args.n_feats)
+        
+    def forward(self, x, guide, coeffs, time):
+        x = self.basic1(x)
+        _, c, h, w = x.shape
+        res = self.conv2(self.relu(self.conv1(x)))
+        res = F.tanh(res)
+        slice_coeffs = self.slice(coeffs, guide)
+        slice_coeffs = self.adjust(slice_coeffs)
+        out = self.apply_coeffs(slice_coeffs, res)
+        
+        # 应用时间调制
+        out = self.time_modulation(out, time)
+        out = out + x
+
+        return out

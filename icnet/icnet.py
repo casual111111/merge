@@ -94,16 +94,20 @@ class LFSRNet(nn.Module):
         
         self.down1 =  common.invUpsampler(scale=2, n_feats=args.n_feats)
         self.down_stage1 = biablock.Biablock(args)
+        self.down_stage1_time = biablock.Biablock_time(args)  # 时间感知版本
         self.down2 =  common.invUpsampler(scale=2, n_feats=args.n_feats)
         self.down_stage2 = biablock.Biablock(args)
+        self.down_stage2_time = biablock.Biablock_time(args)  # 时间感知版本
         self.down3 = common.invUpsampler(scale=2, n_feats=args.n_feats)
         self.down_stage3 = biablock.Biablock(args)
 
         self.up21 = common.Upsampler_module(scale=2, n_feats=args.n_feats)
         self.up2_stage1 = biablock.Biablock(args)
+        self.up2_stage1_time = biablock.Biablock_time(args)  # 时间感知版本
         self.up22 = common.Upsampler_module(scale=2, n_feats=args.n_feats)
 
         self.up2_stage2 = biablock.Biablock(args)
+        self.up2_stage2_time = biablock.Biablock_time(args)  # 时间感知版本
         self.up23 = common.Upsampler_module(scale=2, n_feats=args.n_feats)
         self.up2_stage3 = biablock.Biablock(args)
         self.tail =  nn.Conv2d(in_channels=args.n_feats, out_channels=3, kernel_size=3, stride=1, padding=1)
@@ -170,33 +174,29 @@ class LFSRNet(nn.Module):
         guidance = self.GNet(img)#生成各个尺度的引导图G
         save_x = img 
         
+        #第一层（400x600 ）
         # 初始特征提取和噪声调制
         feature = self.head(x)#F0SR (1, 64, 400, 600)///
-        feature = self.t_enc_layer1(feature, t)  # 第一层噪声调制
+        feature = self.t_enc_layer1(feature, t)  # 第一层特征级噪声调制
         
-        # 编码器路径 - 下采样阶段
-        #######400x600 -> 200x300
+        #第二层（200x300 ）
         x4 = self.down1(feature)#x4(1, 64, 200, 300)///
         grid = grid.view(grid.shape[0], 64, 4, int(H/8),  int(W/8))#grid[1, 64, 4, 50, 75]
         inp4 = self.down_stage1(x4, guidance[1], grid)#guidance(1,1,)#B->) Super-Resolution + 3D + SlcIllumination Adjustment//（64,1248,1248）
-        inp4 = self.t_enc_layer2(inp4, t)  # 第二层噪声调制
-        
-        # 200x300 -> 100x150
+        inp4 = self.down_stage1_time(inp4, guidance[1], grid, t)  # 第一层时间感知噪声调制
+        inp4 = self.t_enc_layer2(inp4, t)  # 第二层特征级噪声调制
         x3 = self.down2(inp4)#x3(1, 64, 100, 150) 
         grid = grid.view(grid.shape[0], 64, int(H/4), int(W/4))#(1,64,100,150))
         gh, gw = grid.shape[-2], grid.shape[-1]
-        grid = self.refine_grid[0](grid, x3, gh, gw) #torch.Size([1, 64, 16, 16])#Illumination Refinement#(64,624,624)
-        x3 = self.t_enc_layer3(x3, t)  # 第三层噪声调制
-
-        # 瓶颈层处理
-        ###100, 150
+        grid = self.refine_grid[0](grid, x3, gh, gw)
+        
+        #第三层（100x150 ）
         grid = grid.view(grid.shape[0], 64, 4, int(H/8),  int(W/8))#(64,4,312,312)
         inp3 = self.down_stage2(x3, guidance[2], grid) ####(64,624,624)
+        inp3 = self.down_stage2_time(inp3, guidance[2], grid, t)  # 第二层时间感知噪声调制
+        inp3 = self.t_enc_layer3(inp3, t) #第三层特征级噪声调制
         inp2 = inp3+ x3
-        
-        # 解码器路径 - 上采样阶段
-        x2= self.up21(inp2)###(1, 64, 200, 300)
-        x2 = self.t_dec_layer3(x2, t)  # 解码器第三层噪声调制
+        x2= self.up21(inp2)
         grid = grid.view(grid.shape[0],64,  int(H/4), int(W/4))
         gh, gw = grid.shape[-2], grid.shape[-1]
         grid = self.refine_grid[1](grid, x2, gh, gw)
@@ -204,9 +204,10 @@ class LFSRNet(nn.Module):
         # 100x150 -> 200x300
         grid = grid.view(grid.shape[0], 64, 4, int(H/8),  int(W/8))
         inp2= self.up2_stage1(x2, guidance[1], grid)###(64,1248,1248)
+        inp2 = self.up2_stage1_time(inp2, guidance[1], grid, t)  # 解码器第一层时间感知噪声调制
+        inp2 = self.t_dec_layer1(inp2, t) #解码器第一层噪声调制 
         inp4 = inp2 + x4
-        x1= self.up22(inp4)#(1,64,2496,2496)
-        x1 = self.t_dec_layer2(x1, t)  # 解码器第二层噪声调制
+        x1= self.up22(inp4)
         grid = grid.view(grid.shape[0],64, int(H/4), int(W/4))
         gh, gw = grid.shape[-2], grid.shape[-1]
         grid = self.refine_grid[2](grid, x1, gh, gw)
@@ -215,7 +216,8 @@ class LFSRNet(nn.Module):
         ###200x300 -> 400x600
         grid = grid.view(grid.shape[0], 64,4, int(H/8),  int(W/8))
         res = self.up2_stage2(x1, guidance[0], grid)
-        res = self.t_dec_layer1(res, t)  # 解码器第一层噪声调制
+        res = self.up2_stage2_time(res, guidance[0], grid, t)  # 解码器第二层时间感知噪声调制
+        res = self.t_dec_layer2(res, t)  # 解码器第二层特征级噪声调制
         sr = self.tail(res) + save_x
         return sr
 

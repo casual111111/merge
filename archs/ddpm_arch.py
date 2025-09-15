@@ -221,7 +221,7 @@ class GaussianDiffusion(nn.Module):
             
             sample_already = False
 
-            ##########icnet##########
+            #########icnet##########
             # pred_x0, supervised_l_list, supervised_r_list, _ = self.restore_fn(self.norm_0_1(x_in), self.norm_0_1(pred_x0), noise_level)
             # pred_x0.clamp_(0., 1.)
 
@@ -258,6 +258,10 @@ class GaussianDiffusion(nn.Module):
             return ret_img
         else:
             return sample_img
+        # if continous:
+        #     return ret_img, supervised_l_list, supervised_r_list
+        # else:
+        #     return sample_img, supervised_l_list, supervised_r_list
 
     def q_sample(self, x_start, continuous_sqrt_alpha_cumprod, noise=None):
         noise = default(noise, lambda: torch.randn_like(x_start))
@@ -308,14 +312,14 @@ class GaussianDiffusion(nn.Module):
         self.x_recon = self.sqrt_recip_alphas_cumprod[t - 1] * x_noisy - self.sqrt_recipm1_alphas_cumprod[t - 1] * model_output
         self.x_recon = torch.clamp(self.x_recon, -1, 1)
 
-        #restore_fn网络
+        # # restore_fn网络
         # self.x_recon_detach = self.x_recon.detach()
         # self.x_recon_output, supervised_l_list, supervised_r_list, l_MoE = self.restore_fn(self.norm_0_1(x_SR), self.norm_0_1(self.x_recon_detach),
         #                                                                                     continuous_sqrt_alpha_cumprod)
         
         # self.x_recon_output = torch.clamp(self.x_recon_output, -1, 1)
+         # 调用 icnet
         self.x_recon_detach = self.x_recon.detach()
-        # 调用 icnet
         if self.icnet is not None:
             self.x_ic_output = self.icnet(self.norm_0_1(x_SR), self.norm_0_1(self.x_recon_detach),
                                                                                             continuous_sqrt_alpha_cumprod)

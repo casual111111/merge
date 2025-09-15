@@ -38,12 +38,13 @@
             "args": [
                 "-opt",
                 "/root/autodl-tmp/low-lightSR/merge/diff_retinex/options/train_diff_retinex_plus_lolv1.yml",
-                "folder_name=my_custom_experiment_name",
+                "--force_yml",
+                "folder_name=debug",
                 "--launcher",
                 "none"
             ],
             "env": {
-                "CUDA_VISIBLE_DEVICES": "0"
+                "CUDA_VISIBLE_DEVICES": "1"
             }
         }
     
