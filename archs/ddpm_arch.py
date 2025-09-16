@@ -320,11 +320,15 @@ class GaussianDiffusion(nn.Module):
         if self.icnet is not None:
             self.x_ic_output,supervised_l_list, supervised_r_list = self.icnet(self.norm_0_1(x_SR), self.norm_0_1(self.x_recon),
                                                                                             continuous_sqrt_alpha_cumprod)
+            # self.x_ic_output = self.icnet(self.norm_0_1(x_SR), self.norm_0_1(self.x_recon),
+            #                                                                                 continuous_sqrt_alpha_cumprod)
+
 
         self.x_ic_output = torch.clamp(self.x_ic_output, 0, 1)
         self.x_ic_output = self.norm_minus1_1(self.x_ic_output)
         # —— 训练端返回 (pred_noise, noise, x_recon) 与你训练代码对齐 —— #
-        return self.pred_noise, self.noise, self.x_ic_output, supervised_l_list, supervised_r_list
+        # return self.pred_noise, self.noise, self.x_ic_output, supervised_l_list, supervised_r_list
+        return self.pred_noise, self.noise, self.x_ic_output
 
     def forward(self, x_HR, x_SR, train_type='ddpm', *args, **kwargs):
         kwargs_cp = kwargs.copy()

@@ -121,9 +121,12 @@ class Retinex_Supervision_Attn(nn.Module):
         self.L_conv = nn.Sequential(nn.Conv2d(dim, dim, kernel_size=3, stride=1, padding=1),
                                     nn.GELU(),
                                     nn.Conv2d(dim, out_channels_L, kernel_size=1, stride=1, padding=0))
-        self.R_conv = nn.Sequential(nn.Conv2d(dim, dim, kernel_size=3, stride=1, padding=1),
-                                    nn.GELU(),
-                                    nn.Conv2d(dim, out_channels_R, kernel_size=1, stride=1, padding=0))
+        self.R_conv = nn.Sequential(
+            nn.Conv2d(dim, dim, kernel_size=3, stride=1, padding=1),
+            nn.GELU(),
+            nn.Conv2d(dim, out_channels_R, kernel_size=1, stride=1, padding=0),
+            nn.Tanh()  # 确保输出在[-1,1]范围内
+        )
         self.L_rein = nn.Sequential(nn.Conv2d(out_channels_L, dim, kernel_size=3, stride=1, padding=1),
                                     nn.GELU())
         self.R_rein = nn.Conv2d(out_channels_R, dim, kernel_size=3, stride=1, padding=1)
@@ -135,7 +138,10 @@ class Retinex_Supervision_Attn(nn.Module):
         L_rein = self.L_rein(L.detach())
         R_rein = self.R_rein(R.detach())
         x = self.illum_attn(x, L_rein)
-        x = x + R_rein
+        x = x + 0.1*R_rein
+        debug_tensor_stats("x", x)
+        debug_tensor_stats("L", L)
+        debug_tensor_stats("R", R)
         return x, L, R
 
 class LightNet(nn.Module):
@@ -203,6 +209,25 @@ class GNet(nn.Module):
 
         return guidance
 
+def debug_tensor_stats(name, t):
+    """
+    打印张量的基本统计信息:
+      - min/max
+      - mean/std
+      - 各通道均值
+    """
+    if t is None:
+        print(f"{name}: None")
+        return
+    # 保证是 CPU 上的 numpy，避免太卡
+    t_cpu = t.detach().cpu()
+    print(f"[{name}] shape={tuple(t_cpu.shape)} "
+          f"min={t_cpu.min().item():.4f} max={t_cpu.max().item():.4f} "
+          f"mean={t_cpu.mean().item():.4f} std={t_cpu.std().item():.4f}")
+    if t_cpu.ndim == 4 and t_cpu.shape[1] <= 10:  # 常见 BCHW
+        ch_mean = t_cpu.mean(dim=(0, 2, 3))
+        print(f"    per-channel mean: {ch_mean.numpy()}")
+
 
 class LFSRNet(nn.Module):
     def __init__(self, args):
@@ -263,6 +288,7 @@ class LFSRNet(nn.Module):
         grid = self.FENet(img)#
         guidance = self.GNet(img)#生成各个尺度的引导图G
         save_x = img 
+        debug_tensor_stats("save_x", save_x)
         
         # 初始特征提取和噪声调制
         feature = self.head(x)#
@@ -286,6 +312,7 @@ class LFSRNet(nn.Module):
         ###100, 150
         grid = grid.view(grid.shape[0], 64, 4, int(H/8),  int(W/8))
         inp3, inp3_l, inp3_r = self.retinex_attn_level3(x3)  # 第三层Retinex监督 - 在进入主模块之前
+        # inp3=x3
         inp3 = self.down_stage2(inp3, guidance[2], grid)
         inp2 = inp3+ x3
         
@@ -299,6 +326,10 @@ class LFSRNet(nn.Module):
         # 100x150 -> 200x300 - 添加Retinex监督
         grid = grid.view(grid.shape[0], 64, 4, int(H/8),  int(W/8))
         inp2, inp2_l, inp2_r = self.retinex_attn_level2(x2)  # 第二层Retinex监督 - 在进入主模块之前
+        debug_tensor_stats("inp2", inp2)
+        debug_tensor_stats("inp2_l", inp2_l)
+        debug_tensor_stats("inp2_r", inp2_r)    
+        # inp2=x2
         inp2= self.up2_stage1(inp2, guidance[1], grid)###(64,1248,1248)
         inp4 = inp2 + x4
         x1= self.up22(inp4)#(1,64,2496,2496)
@@ -311,16 +342,19 @@ class LFSRNet(nn.Module):
         ###200x300 -> 400x600
         grid = grid.view(grid.shape[0], 64,4, int(H/8),  int(W/8))
         res, res_l, res_r = self.retinex_attn_level1(x1)  # 第一层Retinex监督 - 在进入主模块之前
+        # res=x1
         res = self.up2_stage2(res, guidance[0], grid)
         res = self.t_dec_layer1(res, t)  # 解码器第一层噪声调制
         
         # 最终精化阶段的Retinex监督
         res, res_refine_l, res_refine_r = self.retinex_attn_level_refinement(res)
-        
-        sr = self.tail(res) + save_x
-        
+        res_out = self.tail(res)
+        debug_tensor_stats("tail(res)", res_out)
+        sr = 0.5*res_out + save_x
+        debug_tensor_stats("sr", sr)
         # 返回结果和Retinex监督信息
         return sr, [res_refine_l, res_l, inp2_l, inp3_l], [res_refine_r, res_r, inp2_r, inp3_r]
+        # return sr
 
 def make_model(args):
     return LFSRNet(args)
