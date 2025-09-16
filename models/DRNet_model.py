@@ -212,7 +212,7 @@ class DRNetModel(BaseModel):
         l_retinex_r = [F.l1_loss(r, r_gt) for r in supervised_r_list]
         l_retinex = 0.5 * sum(l_retinex_l) + sum(l_retinex_r)
 
-        l_total += l_l1 + 0.2 * l_retinex + l_diff
+        l_total += l_l1 + 0.01 * l_retinex + l_diff
         loss_dict['l_l1'] = l_l1
         loss_dict['l_diff'] = l_diff
         loss_dict['l_retinex'] = l_retinex
